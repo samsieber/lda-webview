@@ -25,6 +25,9 @@ my_pie = (function(){
         },
         "data": {
             "sortOrder": "value-desc",
+            "smallSegmentGrouping": {
+                "enabled": true
+            },
             "content": []
         },
         "labels": {

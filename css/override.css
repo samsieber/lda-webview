@@ -1,3 +1,35 @@
+.line { 
+    stroke: steelblue;
+    stroke-width: 2;
+    fill: none;
+}
+
+#GO{
+    top:-10px;
+    left:00px;
+}
+
+a.disabled, a.disabled:hover, a.disabled:active {
+    background-color: #008cba;
+}
+
+h1{
+    display:inline-block;
+
+}
+
+.axis path,
+.axis line {
+    fill: none;
+    stroke: grey;
+    stroke-width: 1;
+    shape-rendering: crispEdges;
+}
+
+path.domain {
+    fill: none;
+}
+
 .sidebar{
     background: #fafafa;
     padding: 32px 20px;

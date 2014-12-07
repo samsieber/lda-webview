@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Foundation | Welcome</title>
+    <title>View LDA Results</title>
     <link rel="stylesheet" href="css/foundation.css" />
     <script src="js/vendor/modernizr.js"></script>
     
@@ -11,6 +11,7 @@
     <script src="js/d3.js"></script>
     <script src="js/d3pie.js"></script>
     <script src="js/scatterplot.js"></script>
+    <script src="js/linegraph.js"></script>
     
     <link rel="stylesheet" href="css/override.css" />
     <script src="js/mypie.js"></script>
@@ -19,7 +20,7 @@
     
     <div class="row istop">
       <div class="large-12 columns">
-        <h1>Welcome to Foundation</h1>
+        <h1>View LDA results</h1> &nbsp;&nbsp;&nbsp;&nbsp; <a href="#!" id=GO class=button onclick="goback()">Previous View</a>
       </div>
     </div>
     
@@ -65,6 +66,11 @@
     </script>
     <script>
         var features, topics, documents, word_tots, feature_points
+        var states=[];
+        
+        function get_year(str){
+            return parseInt(str.substring(str.length-4,str.length))
+        }
         
         function set_title(t){
             $("#title").html(t)
@@ -81,6 +87,52 @@
             })
         }
         
+        function by_year(func){
+            var year_data = {};
+            for (var x = 1955; x < 2015; x++){
+                year_data[x] = 0
+            }
+            documents.forEach(function(d){
+                year_data[get_year(d.date)]+=func(d.counts)
+            })
+            var counts = [];
+            for (var x = 1955; x < 2015; x++){
+                counts.push({
+                    year:x,
+                    count:year_data[x]
+                });
+            };
+            console.log(counts);
+            return counts;
+        }
+        
+        function top_by_year(t){
+            return by_year(function(counts){return counts[t]});
+        }
+        
+        function words_by_year(){
+            return by_year(function(counts){return sum(counts)});
+        }
+        
+        function p_by_year(t){
+            var tots = words_by_year();
+            var ttots = {}
+            tots.forEach(function(t){ttots[t.year] = t.count})
+            var points = top_by_year(t).map(function(v,i){
+                console.log(v.count, tots[i].count);
+                if (tots[i].count > 0){
+                    return {year:parseInt(v.year),
+                            count:v.count*1.0/tots[i].count};
+                } else {
+                    return {year:parseInt(v.year), count:0};
+                }
+            }).sort(function(a,b){return a.year < b.year});
+            console.log(points);
+            points = points.sort(function(a,b){return a.year - b.year})
+            return points;
+        }
+        
+        
         function labelled_topics(t){
             console.log(topics, sum(topics.map(function(a){return a.total})))
             return topics[t].words.map(function(c,fi){
@@ -89,6 +141,7 @@
                    "share (%)":Math.round(c*100/word_tots[fi])+"%",
                    share:Math.round(c*100/word_tots[fi]),
                    exclusive:word_tots[fi]==c,
+                   index:fi,
                    count:c
                }
             }).filter(function(a){
@@ -137,41 +190,47 @@
             return l.map(getter);
         }
         
-        function show_list(data, title, getters, titles, link_function){
+        function show_list(data, title, getters, color_func, link_function){
             var list = $("#list")
-            console.log(data);
+            console.log(color_func);
             list.empty();
             var title = list.html("<h3>"+title+"</h3>");
             var table = d3.select("#list").append("div").append("table");
             var rows = table.selectAll("tr").data(data).enter().append('tr');
             getters.forEach(function(g,i){
-                console.log("HERE!",g,getter(g));
                 var xx = rows.append('td').text(getter(g));
                 if (i == 0 && link_function){
                     xx.on('click',link_function)
                 }
-                console.log(getter(g)(data[0]));
+                if (color_func){
+                    xx.style("color",color_func)
+                }
+                console.log(g);
             })
         }
         
         function display_topic(d,i){
+            
+            function do_display_word(d,i){
+                return advance(feature_points[d.index],d.index,'token')
+            }
+            
+            var color =  d3.scale.quantile().domain([0,10,90,100]).range(['red','black','green']);
             $("#display").empty();
             set_title("Displaying topic:<em>" + i + "</em> Word Count:<em>"+d.total+"</em>");
             console.log(labelled_topics(i))
             //mypie("mypie","topic "+i,"Most common words");
-            var data = labelled_topics(i)
-            exclusive_string = data.filter(function(d){
-                return d.exclusive || d.share >= 90; })
-                .map(function(d){ return "<h5>"+d.word+"</h5>" })
-                .reduce(function(a,b){return a+b});
+            var data = labelled_topics(i);
             //$("#display").html("<h4> Mostly exclusive words (% only in this topic >= 90 ) </h4>" + exclusive_string);
-            show_list(data,"Word occurence",["word","share (%)","count"]);
+            show_list(data,"Word occurence",["word","share (%)","count"],function asdf(d){return color(d.share)},do_display_word);
             draw_scatter_plot("#display",data,"share","count",{w:500,h:500});
+            var d = p_by_year(i);
+            draw_line_graph("#display",d,{w:500,h:500});
         }
         
         function display_document(d,i){
             function do_display_topic(d,i){
-                return display_topic(topics[d.topic],d.topic)
+                return advance(topics[d.topic],d.topic,'topic')
             }
             set_title(d.title);
             $("#display").html("<span><h4>Speaker: " + d.artist +"&nbsp;&nbsp;&nbsp;&nbsp;Date: "+d.date+
@@ -180,6 +239,10 @@
            
             var data = labelled_doc(i)
             display_list(data,"Topic counts",do_display_topic);
+            
+            var disp_topics = d.counts.map(function(count,index){return {label:"Topic "+index,index:index, value:count}});
+            my_pie("display","","Breakdown by topic", disp_topics)
+            
         }
         
         function select_documents(){
@@ -190,7 +253,7 @@
                 .data(documents)
                 .enter()
                   .append('li')
-                  .on('click',display_document)
+                  .on('click',do_advance("doc"))
                   .text(function(d){return d.title});
         }
         
@@ -202,7 +265,7 @@
                 .data(topics)
                 .enter()
                   .append('li')
-                  .on('click',display_topic)
+                  .on('click',do_advance("topic"))
                   .text(function(d,i){return "Topic "+i+" ["+d.total+"]"});
         }
         
@@ -251,6 +314,51 @@
         }
         
         function display_feat(f,i){
+            function do_display_topic(d,i){
+                return advance(topics[d.index],d.index,'topic')
+            }
+            $("#display").empty();
+            var disp_topics = f.topics.map(function(o){return {topic:"Topic "+o.index,index:o.index, count:o.count}})
+            set_title("Stats for word: " + f.word);
+            my_pie("display",f.word,"Breakdown by topic", f.topics.map(function(t){return {value:t.count,label:"Topic "+t.index}}))
+            show_list(disp_topics,"Topics",["topic","count"], undefined, do_display_topic)
+        }
+        
+        var displayers = {
+            topic:display_topic,
+            doc:display_document,
+            token:display_feat
+        }
+        
+        function advance(a,b,type){
+            states.push({
+                value:a,
+                index:b,
+                type:type
+            })
+            displayers[type](a,b)
+            if (states.length > 1){
+                $("#GO").toggleClass("disabled",false);
+                $("#GO").prop("disabled",false);
+            }
+        }
+        
+        function do_advance(type){
+            return function(a,b){
+                return advance(a,b,type)
+            }
+        }
+        
+        function goback(){
+            if (states.length > 1){
+                states.pop()
+                var a = states[states.length-1]
+                displayers[a.type](a.value,a.index)
+                if (states.length < 3){
+                    $("#GO").toggleClass("disabled",true);
+                    $("#GO").prop("disabled",true);
+                }
+            }
         }
         
         function update_word_list(){
@@ -269,7 +377,7 @@
                     .data(feats)
                     .enter()
                       .append('li')
-                      .on('click',display_feat)
+                      .on('click',do_advance("token"))
                       .text(function(d,i){return d.word});
             }
         }
@@ -294,6 +402,8 @@
         }
         
         $(function(){
+            $("#GO").toggleClass("disabled",true);
+            $("#GO").prop("disabled",true);
             hide_subforms();
             $('.sidebar').hide();
             $("#temp").show();

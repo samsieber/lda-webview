@@ -1,3 +1,4 @@
+// Adapted from http://stackoverflow.com/questions/10440646/a-simple-scatterplot-example-in-d3-js
 function draw_scatter_plot(select, data, xattr, yattr, size){
  
     // data that you want to plot, I've used separate arrays for x and y values
@@ -61,6 +62,6 @@ function draw_scatter_plot(select, data, xattr, yattr, size){
       .enter().append("svg:circle")  // create a new circle for each value
           .attr("cy", function (d) { return y(d); } ) // translate y value to a pixel
           .attr("cx", function (d,i) { return x(xdata[i]); } ) // translate x value
-          .attr("r", 10) // radius of circle
-          .style("opacity", 0.6); // opacity of circle
+          .attr("r", function (d,i) {return Math.log(xdata[i]+1)*1.5 + 2}) // radius of circle
+          .style("opacity", 0.2); // opacity of circle
 }
