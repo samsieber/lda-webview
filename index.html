@@ -1,0 +1,309 @@
+<!doctype html>
+<html class="no-js" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Foundation | Welcome</title>
+    <link rel="stylesheet" href="css/foundation.css" />
+    <script src="js/vendor/modernizr.js"></script>
+    
+    
+    <script src="js/d3.js"></script>
+    <script src="js/d3pie.js"></script>
+    <script src="js/scatterplot.js"></script>
+    
+    <link rel="stylesheet" href="css/override.css" />
+    <script src="js/mypie.js"></script>
+  </head>
+  <body>
+    
+    <div class="row istop">
+      <div class="large-12 columns">
+        <h1>Welcome to Foundation</h1>
+      </div>
+    </div>
+    
+    <div id=rest class="row isbot">
+      <div class="large-3 columns">
+          <div id=temp class=sidebar>
+              <h2>Select View</h2>
+          </div>
+          <div class="sidebar scroll">
+              <h2>Select View</h2>
+              <form>
+                <input type=radio name=select class="trigger" value=topic-select>Topic</input>
+                <input type=radio name=select class="trigger" value=doc-select>Document</input>
+                <input type=radio name=select class="trigger" value=token-select>Feature</input>
+              </form>
+              <!--<form id=topic-select class="subform">
+                <input type=text placeholder="topic word"></input>
+              </form>
+              <!--<form id=doc-select class="subform">
+                <input id=author-input type=text placeholder="doc author filter"></input>
+                <input id=title-input  type=text placeholder="doc title filter" ></input>
+              </form>-->
+              <form id=token-select class="subform">
+                <input id=token-input type=text placeholder="word / token / feature filter"></input>
+              </form>
+              <div id=filter-options>
+                
+              </div>
+          </div>
+      </div>
+      <div id=list class="large-3 columns scroll">
+      </div>
+      <div class="large-6 columns scroll">
+        <h3 id=title></h3>
+        <div id=display>
+        </div>
+      </div>
+    </div>
+    <script src="js/vendor/jquery.js"></script>
+    <script src="js/foundation.min.js"></script>
+    <script>
+      $(document).foundation();
+    </script>
+    <script>
+        var features, topics, documents, word_tots, feature_points
+        
+        function set_title(t){
+            $("#title").html(t)
+        }
+        
+        // My custom stuff
+        function hide_subforms(){
+            $('.subform').hide();
+        }
+        
+        function sum(l){
+            return l.reduce(function(a,b){
+                return a+b;
+            })
+        }
+        
+        function labelled_topics(t){
+            console.log(topics, sum(topics.map(function(a){return a.total})))
+            return topics[t].words.map(function(c,fi){
+               return {
+                   word:features[fi],
+                   "share (%)":Math.round(c*100/word_tots[fi])+"%",
+                   share:Math.round(c*100/word_tots[fi]),
+                   exclusive:word_tots[fi]==c,
+                   count:c
+               }
+            }).filter(function(a){
+                return a.count > 0;
+            }).sort(function(a,b){
+                return b.count - a.count;
+            });
+        }
+        
+        function labelled_doc(t){
+            return documents[t].counts.map(function(c,fi){
+               return {
+                   label:"Topic "+fi,
+                   topic:fi,
+                   value:c
+               }
+            }).filter(function(a){
+                return a.value > 0;
+            }).sort(function(a,b){
+                return b.value - a.value;
+            });
+        }
+        
+        function display_list(data, title, link_function){
+            var list = $("#list")
+            list.empty();
+            var title = list.html("<h3>"+title+"</h3>");
+            var table = d3.select("#list").append("div").append("table");
+            var rows = table.selectAll("tr").data(data).enter().append('tr');
+            var names = rows.append('td')
+                .text(function(d){return d.label});
+            var values = rows.append('td')
+                .text(function(d){return d.value});
+            if (link_function){
+                names.on('click',link_function);
+            }
+        }
+        
+        function getter(attr){
+            return function gg(a){
+                return a[attr];
+            }
+        }
+        
+        function getters(l){
+            return l.map(getter);
+        }
+        
+        function show_list(data, title, getters, titles, link_function){
+            var list = $("#list")
+            console.log(data);
+            list.empty();
+            var title = list.html("<h3>"+title+"</h3>");
+            var table = d3.select("#list").append("div").append("table");
+            var rows = table.selectAll("tr").data(data).enter().append('tr');
+            getters.forEach(function(g,i){
+                console.log("HERE!",g,getter(g));
+                var xx = rows.append('td').text(getter(g));
+                if (i == 0 && link_function){
+                    xx.on('click',link_function)
+                }
+                console.log(getter(g)(data[0]));
+            })
+        }
+        
+        function display_topic(d,i){
+            $("#display").empty();
+            set_title("Displaying topic:<em>" + i + "</em> Word Count:<em>"+d.total+"</em>");
+            console.log(labelled_topics(i))
+            //mypie("mypie","topic "+i,"Most common words");
+            var data = labelled_topics(i)
+            exclusive_string = data.filter(function(d){
+                return d.exclusive || d.share >= 90; })
+                .map(function(d){ return "<h5>"+d.word+"</h5>" })
+                .reduce(function(a,b){return a+b});
+            //$("#display").html("<h4> Mostly exclusive words (% only in this topic >= 90 ) </h4>" + exclusive_string);
+            show_list(data,"Word occurence",["word","share (%)","count"]);
+            draw_scatter_plot("#display",data,"share","count",{w:500,h:500});
+        }
+        
+        function display_document(d,i){
+            function do_display_topic(d,i){
+                return display_topic(topics[d.topic],d.topic)
+            }
+            set_title(d.title);
+            $("#display").html("<span><h4>Speaker: " + d.artist +"&nbsp;&nbsp;&nbsp;&nbsp;Date: "+d.date+
+               "&nbsp;&nbsp;&nbsp;&nbsp;"+ "<a href='http://speeches.byu.edu/"+d.link+"'> View </a></h4>");
+            
+           
+            var data = labelled_doc(i)
+            display_list(data,"Topic counts",do_display_topic);
+        }
+        
+        function select_documents(){
+            $("#filter-options").empty()
+            var area = d3.select("#filter-options");
+            var ul = area.select('ul').append('ul')
+            var lis = area.selectAll('li')
+                .data(documents)
+                .enter()
+                  .append('li')
+                  .on('click',display_document)
+                  .text(function(d){return d.title});
+        }
+        
+        function select_topic(){
+            $("#filter-options").empty()
+            var area = d3.select("#filter-options");
+            var ul = area.select('ul').append('ul')
+            var lis = area.selectAll('li')
+                .data(topics)
+                .enter()
+                  .append('li')
+                  .on('click',display_topic)
+                  .text(function(d,i){return "Topic "+i+" ["+d.total+"]"});
+        }
+        
+        
+        function show_sidebar(){
+            $(".sidebar").show();
+            $("#temp").hide();
+        }
+        
+        function load_data(json){
+           features = json.features;
+           topics = json.topics;
+           documents = json.docs; 
+           word_tots = topics.map(function(m){
+               return m.words;
+           }).reduce(function(ws,a){
+                return ws.map(function(b,x){
+                    return a[x]+b;
+                })
+           })
+           var top_words = topics.map(function(m){
+               return m.words;
+           })
+           word_tops = features.map(function(w,i){
+               return top_words.map(function(m){
+                   return m[i];
+               });
+           });
+           feature_points = features.map(function(f,i){
+               return {
+                   word:f,
+                   topics:word_tops[i].map(function(wt,j){
+                       return {
+                           index:j,
+                           count:wt
+                       }
+                   }).filter(function(wt){
+                        return wt.count > 0;
+                   })
+               }
+           });
+        }
+        
+        function display_message(message){
+            $("#filter-options").html("<h5>"+message+"</h5>");
+        }
+        
+        function display_feat(f,i){
+        }
+        
+        function update_word_list(){
+            var field = $(this);
+            var val = field.val();
+            var feats = feature_points.filter(function(m){
+                return m.word.indexOf(val) > -1;
+            });
+            if (feats.length > 200 && val.length < 3){
+                display_message("Too many results");
+            } else {
+                $("#filter-options").empty()
+                var area = d3.select("#filter-options");
+                var ul = area.select('ul').append('ul')
+                var lis = area.selectAll('li')
+                    .data(feats)
+                    .enter()
+                      .append('li')
+                      .on('click',display_feat)
+                      .text(function(d,i){return d.word});
+            }
+        }
+        
+        function select_features(){
+            $("#filter-options").empty();
+            display_message("Start typing a feature");
+        }
+        
+        selectors = {
+            'topic-select':select_topic,
+            'doc-select':select_documents,
+            'token-select':select_features
+        }
+        
+        function select_form(){
+            hide_subforms();
+            var name = $(this).attr('value')
+            console.log(name);
+            $("#"+$(this).attr('value')).show();
+            selectors[name]()
+        }
+        
+        $(function(){
+            hide_subforms();
+            $('.sidebar').hide();
+            $("#temp").show();
+            $(".trigger").click(select_form);
+            $('#token-input').on('input propertychange paste', update_word_list);
+            $.ajax({
+              dataType: "json",
+              url: "results.json"
+            }).then(load_data).then(show_sidebar);
+        });
+    </script>
+  </body>
+</html>
