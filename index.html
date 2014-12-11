@@ -234,7 +234,7 @@
             }
             set_title(d.title);
             $("#display").html("<span><h4>Speaker: " + d.artist +"&nbsp;&nbsp;&nbsp;&nbsp;Date: "+d.date+
-               "&nbsp;&nbsp;&nbsp;&nbsp;"+ "<a href='http://speeches.byu.edu/"+d.link+"'> View </a></h4>");
+               "&nbsp;&nbsp;&nbsp;&nbsp;"+ "<a href='"+d.link+"'> View </a></h4>");
             
            
             var data = labelled_doc(i)
@@ -277,7 +277,12 @@
         
         function load_data(json){
            features = json.features;
-           topics = json.topics;
+           topics = json.topics.map(function(t){
+               return {
+                   total:sum(t),
+                   words:t
+               }
+           });
            documents = json.docs; 
            word_tots = topics.map(function(m){
                return m.words;
